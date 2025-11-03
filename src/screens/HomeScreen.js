@@ -1,56 +1,66 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Button from '../components/Button';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { getColors, SIZES, FONTS, SHADOWS, RADIUS } from '../constants/theme';
 
 export default function HomeScreen({ navigation }) {
-  const [username, setUsername] = useState('');
-  const { isDark, toggleTheme } = useTheme();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { isDark } = useTheme();
+  const { user } = useAuth();
   const COLORS = getColors(isDark);
 
-  const handleQuickBattle = () => {
-    if (username.trim()) {
-      navigation.navigate('Categories', { mode: 'quick', username });
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
     }
+  }, [user]);
+
+  const fetchProfile = async () => {
+    try {
+      const { data, error} = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickBattle = () => {
+    navigation.navigate('Categories', { mode: 'quick', username: profile?.username });
   };
 
   const handleCreateRoom = () => {
-    if (username.trim()) {
-      navigation.navigate('Categories', { mode: 'create', username });
-    }
+    navigation.navigate('Categories', { mode: 'create', username: profile?.username });
   };
 
   const handleJoinRoom = () => {
-    if (username.trim()) {
-      navigation.navigate('JoinRoom', { username });
-    }
+    navigation.navigate('JoinRoom', { username: profile?.username });
   };
 
   return (
     <View style={[styles.container, { backgroundColor: COLORS.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={isDark ? [COLORS.background, COLORS.backgroundSecondary] : [COLORS.background, COLORS.backgroundSecondary]}
+        colors={[COLORS.background, COLORS.backgroundSecondary]}
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.content}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
           >
-            {/* Theme Toggle */}
-            <View style={styles.topBar}>
-              <TouchableOpacity
-                onPress={toggleTheme}
-                style={[styles.themeToggle, { backgroundColor: COLORS.card }, SHADOWS.small]}
-              >
-                <Text style={[styles.themeIcon, { color: COLORS.text }]}>{isDark ? '☀' : '☾'}</Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Header */}
             <View style={styles.header}>
               <LinearGradient
@@ -61,60 +71,117 @@ export default function HomeScreen({ navigation }) {
               >
                 <Text style={styles.logoText}>TB</Text>
               </LinearGradient>
-              <Text style={[styles.title, { color: COLORS.text }]}>Trivia Batu</Text>
+              <Text style={[styles.title, { color: COLORS.text }]}>
+                {profile ? `Welcome back, ${profile.username}!` : 'Trivia Batu'}
+              </Text>
               <Text style={[styles.subtitle, { color: COLORS.textSecondary }]}>
-                Battle your friends in real-time
+                Choose your battle mode
               </Text>
             </View>
 
-            {/* Form */}
-            <View style={styles.form}>
-              <View style={[styles.inputContainer, { backgroundColor: COLORS.card }, SHADOWS.small]}>
-                <View style={[styles.inputIconContainer, { backgroundColor: COLORS.primary + '15' }]}>
-                  <Text style={[styles.inputIconText, { color: COLORS.primary }]}>U</Text>
+            {/* Game Modes */}
+            <View style={styles.modesContainer}>
+              {/* Quick Battle */}
+              <TouchableOpacity
+                style={[styles.modeCard, SHADOWS.large]}
+                onPress={handleQuickBattle}
+              >
+                <LinearGradient
+                  colors={[COLORS.primary, COLORS.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modeGradient}
+                >
+                  <View style={styles.modeIconContainer}>
+                    <Text style={styles.modeIcon}>⚡</Text>
+                  </View>
+                  <Text style={styles.modeTitle}>Quick Battle</Text>
+                  <Text style={styles.modeDescription}>
+                    Jump into a fast-paced trivia match
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Create Room */}
+              <TouchableOpacity
+                style={[styles.modeCard, SHADOWS.large]}
+                onPress={handleCreateRoom}
+              >
+                <LinearGradient
+                  colors={[COLORS.secondary, COLORS.secondaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modeGradient}
+                >
+                  <View style={styles.modeIconContainer}>
+                    <Text style={styles.modeIcon}>➕</Text>
+                  </View>
+                  <Text style={styles.modeTitle}>Create Room</Text>
+                  <Text style={styles.modeDescription}>
+                    Start your own private game
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Join Room */}
+              <TouchableOpacity
+                style={[styles.modeCard, SHADOWS.large]}
+                onPress={handleJoinRoom}
+              >
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modeGradient}
+                >
+                  <View style={styles.modeIconContainer}>
+                    <Text style={styles.modeIcon}>🚪</Text>
+                  </View>
+                  <Text style={styles.modeTitle}>Join Room</Text>
+                  <Text style={styles.modeDescription}>
+                    Enter a room with a code
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            {/* Your Stats */}
+            {profile && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: COLORS.text }]}>
+                  Your Stats
+                </Text>
+                <View style={[styles.statsCard, { backgroundColor: COLORS.card }, SHADOWS.medium]}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: COLORS.primary }]}>
+                      {profile.total_games || 0}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: COLORS.textSecondary }]}>
+                      Games Played
+                    </Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: COLORS.border }]} />
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: COLORS.success }]}>
+                      {profile.total_wins || 0}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: COLORS.textSecondary }]}>
+                      Wins
+                    </Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: COLORS.border }]} />
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: COLORS.secondary }]}>
+                      {profile.total_points || 0}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: COLORS.textSecondary }]}>
+                      Points
+                    </Text>
+                  </View>
                 </View>
-                <TextInput
-                  style={[styles.input, { color: COLORS.text }]}
-                  placeholder="Enter your username"
-                  placeholderTextColor={COLORS.textLight}
-                  value={username}
-                  onChangeText={setUsername}
-                  maxLength={20}
-                  autoCapitalize="none"
-                />
               </View>
-
-              <View style={styles.buttonContainer}>
-                <Button
-                  title="Quick Battle"
-                  onPress={handleQuickBattle}
-                  disabled={!username.trim()}
-                  style={styles.button}
-                />
-                <Button
-                  title="Create Room"
-                  onPress={handleCreateRoom}
-                  variant="secondary"
-                  disabled={!username.trim()}
-                  style={styles.button}
-                />
-                <Button
-                  title="Join Room"
-                  onPress={handleJoinRoom}
-                  variant="outline"
-                  disabled={!username.trim()}
-                  style={styles.button}
-                />
-              </View>
-            </View>
-
-            {/* Footer */}
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: COLORS.textLight }]}>
-                Choose your battle mode and start playing
-              </Text>
-            </View>
-          </KeyboardAvoidingView>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -131,33 +198,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: SIZES.lg,
-  },
-  topBar: {
-    alignItems: 'flex-end',
-    paddingTop: SIZES.sm,
-    paddingBottom: SIZES.md,
-  },
-  themeToggle: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  themeIcon: {
-    fontSize: 24,
+  scrollContent: {
+    paddingBottom: SIZES.xxl + 60, // Extra padding for bottom tabs
   },
   header: {
     alignItems: 'center',
-    marginTop: SIZES.lg,
+    paddingTop: SIZES.xl,
+    paddingHorizontal: SIZES.lg,
     marginBottom: SIZES.xxl,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: RADIUS.xxl,
     alignItems: 'center',
     justifyContent: 'center',
@@ -171,57 +223,87 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   title: {
-    fontSize: FONTS.xxlarge + 8,
+    fontSize: FONTS.xxlarge,
     fontWeight: '800',
     marginBottom: SIZES.xs,
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: FONTS.medium,
-    fontWeight: '400',
-  },
-  form: {
-    flex: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SIZES.md,
-    marginBottom: SIZES.xl,
-    height: 56,
-    gap: SIZES.sm,
-  },
-  inputIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputIconText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  input: {
-    flex: 1,
-    fontSize: FONTS.medium,
     fontWeight: '500',
+    textAlign: 'center',
   },
-  buttonContainer: {
+  modesContainer: {
+    paddingHorizontal: SIZES.lg,
+    marginBottom: SIZES.xl,
     gap: SIZES.md,
   },
-  button: {
-    marginVertical: SIZES.xs,
+  modeCard: {
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+    marginBottom: SIZES.sm,
   },
-  footer: {
+  modeGradient: {
+    padding: SIZES.xl,
     alignItems: 'center',
-    paddingBottom: SIZES.xl,
-    paddingTop: SIZES.lg,
   },
-  footerText: {
-    fontSize: FONTS.regular,
-    textAlign: 'center',
+  modeIconContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: RADIUS.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SIZES.md,
+  },
+  modeIcon: {
+    fontSize: 36,
+  },
+  modeTitle: {
+    fontSize: FONTS.xlarge,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: SIZES.xs,
+  },
+  modeDescription: {
+    fontSize: FONTS.small,
     fontWeight: '500',
+    color: '#FFFFFF',
+    opacity: 0.9,
+    textAlign: 'center',
+  },
+  section: {
+    paddingHorizontal: SIZES.lg,
+    marginBottom: SIZES.xl,
+  },
+  sectionTitle: {
+    fontSize: FONTS.large,
+    fontWeight: '700',
+    marginBottom: SIZES.md,
+  },
+  statsCard: {
+    flexDirection: 'row',
+    borderRadius: RADIUS.lg,
+    padding: SIZES.lg,
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: FONTS.xxlarge + 4,
+    fontWeight: '800',
+    marginBottom: SIZES.xxs,
+  },
+  statLabel: {
+    fontSize: FONTS.small,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    marginHorizontal: SIZES.sm,
   },
 });

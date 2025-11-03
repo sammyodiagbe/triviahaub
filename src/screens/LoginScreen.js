@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, StatusBar, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Button from '../components/Button';
+import CustomAlert from '../components/CustomAlert';
+import { useAlert } from '../hooks/useAlert';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { getColors, SIZES, FONTS, SHADOWS, RADIUS } from '../constants/theme';
@@ -13,12 +15,18 @@ export default function LoginScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { isDark, toggleTheme } = useTheme();
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
+  const { alertState, showAlert, hideAlert } = useAlert();
   const COLORS = getColors(isDark);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert(
+        'Missing Information',
+        'Please fill in all fields to continue.',
+        [{ text: 'OK' }],
+        'warning'
+      );
       return;
     }
 
@@ -27,7 +35,12 @@ export default function LoginScreen({ navigation }) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Login Failed', error);
+      showAlert(
+        'Login Failed',
+        error,
+        [{ text: 'Try Again' }],
+        'error'
+      );
     } else {
       // Navigation will be handled by auth state change
       navigation.navigate('Home');
@@ -38,9 +51,46 @@ export default function LoginScreen({ navigation }) {
     navigation.navigate('Signup');
   };
 
-  const handleForgotPassword = () => {
-    // TODO: Add forgot password functionality
-    Alert.alert('Forgot Password', 'Password reset functionality coming soon!');
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      showAlert(
+        'Email Required',
+        'Please enter your email address to reset your password.',
+        [{ text: 'OK' }],
+        'info'
+      );
+      return;
+    }
+
+    showAlert(
+      'Reset Password',
+      `Send password reset link to ${email.trim()}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Link',
+          onPress: async () => {
+            const { error } = await resetPassword(email.trim());
+            if (error) {
+              showAlert(
+                'Error',
+                error,
+                [{ text: 'OK' }],
+                'error'
+              );
+            } else {
+              showAlert(
+                'Email Sent!',
+                'Password reset link has been sent to your email. Please check your inbox.',
+                [{ text: 'OK' }],
+                'success'
+              );
+            }
+          },
+        },
+      ],
+      'info'
+    );
   };
 
   return (
@@ -178,6 +228,16 @@ export default function LoginScreen({ navigation }) {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        onDismiss={hideAlert}
+      />
     </View>
   );
 }

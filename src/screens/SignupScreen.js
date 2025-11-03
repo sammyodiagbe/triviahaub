@@ -3,7 +3,10 @@ import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Touc
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Button from '../components/Button';
+import CustomAlert from '../components/CustomAlert';
+import { useAlert } from '../hooks/useAlert';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { getColors, SIZES, FONTS, SHADOWS, RADIUS } from '../constants/theme';
 
 export default function SignupScreen({ navigation }) {
@@ -13,13 +16,58 @@ export default function SignupScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { isDark, toggleTheme } = useTheme();
+  const { signUp, signIn } = useAuth();
+  const { alertState, showAlert, hideAlert } = useAlert();
   const COLORS = getColors(isDark);
 
-  const handleSignup = () => {
-    // TODO: Add signup functionality
-    // For now, just navigate to Home
-    navigation.navigate('Home');
+  const handleSignup = async () => {
+    if (!isFormValid()) {
+      showAlert(
+        'Incomplete Form',
+        'Please ensure all fields are filled correctly and passwords match.',
+        [{ text: 'OK' }],
+        'warning'
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    // Sign up the user
+    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, username.trim());
+
+    if (signUpError) {
+      setLoading(false);
+      showAlert(
+        'Signup Failed',
+        signUpError,
+        [{ text: 'Try Again' }],
+        'error'
+      );
+      return;
+    }
+
+    // Automatically sign in the user after signup
+    const { data: signInData, error: signInError } = await signIn(email.trim(), password);
+    setLoading(false);
+
+    if (signInError) {
+      showAlert(
+        'Account Created',
+        'Your account was created successfully! Please login to continue.',
+        [{ text: 'Login', onPress: () => navigation.navigate('Login') }],
+        'success'
+      );
+    } else {
+      showAlert(
+        'Welcome!',
+        'Your account has been created successfully. Let\'s get started!',
+        [{ text: 'Start Playing', onPress: () => navigation.replace('Home') }],
+        'success'
+      );
+    }
   };
 
   const handleLoginPress = () => {
@@ -202,6 +250,7 @@ export default function SignupScreen({ navigation }) {
                   title="Create Account"
                   onPress={handleSignup}
                   disabled={!isFormValid()}
+                  loading={loading}
                   style={styles.signupButton}
                   variant="secondary"
                 />
@@ -244,6 +293,16 @@ export default function SignupScreen({ navigation }) {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        onDismiss={hideAlert}
+      />
     </View>
   );
 }
